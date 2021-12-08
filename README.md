@@ -4,6 +4,7 @@
 * [About](#about)
 * [Quickstart](#quickstart)
 * [Environment Variables](#environment-variables)
+* [Tour](#tour)
 
 ## About
 This bot connects to a list of IRC servers and downloads the .torrent files based on the configuration given
@@ -40,4 +41,6 @@ make fmt lint test
 | `DOWNLOAD_DIR`    | string | Yes       | Download folder relative to the root  |
 | `DOWNLOAD_LINK`   | string | Yes       | Don't change it, template to download |
 
-[!docs/screenshots/irc_downloader.png]
+## Tour / Screenshots
+![downloader](https://gitlab.com/ftamas88/irc-bot/-/raw/main/docs/screenshots/irc_downloader.png)
+![files](https://gitlab.com/ftamas88/irc-bot/-/raw/main/docs/screenshots/downloaded.png)
