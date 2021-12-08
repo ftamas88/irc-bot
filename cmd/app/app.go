@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,8 +11,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	irc "github.com/fluffle/goirc/client"
+	"github.com/ftamas88/irc-bot/internal/client"
 	"github.com/ftamas88/irc-bot/internal/config"
 	log "github.com/sirupsen/logrus"
 )
@@ -54,23 +55,15 @@ func main() {
 		log.Fatalf("[~] iRC downloader - fatal error: %s", err.Error())
 	}
 
-	cfg := irc.NewConfig(config.Nick)
-
-	if config.Port != 6667 {
-		cfg.SSL = true
-		cfg.SSLConfig = &tls.Config{ServerName: config.Server}
-	}
-
-	cfg.Server = fmt.Sprintf("%s:%d", config.Server, config.Port)
-	cfg.NewNick = func(n string) string {
-		return n + "^"
-	}
-	client := irc.Client(cfg)
+	client := client.Client(config)
 
 	// Initial stuff
 	client.HandleFunc(irc.CONNECTED,
 		func(conn *irc.Conn, line *irc.Line) {
-			log.WithField("server", config.Server).Info("[+] Connected to the iRC server")
+			log.
+				WithField("server", config.Server).
+				WithField("port", config.Port).
+				Info("[+] Connected to the iRC server")
 
 			conn.Privmsg("NBOT", fmt.Sprintf("!invite %s", config.InviteCode))
 			conn.Mode("#ncore-bot", "+r")
@@ -109,9 +102,18 @@ func handleMessage(cfg *config.Config, line *irc.Line) {
 	/*
 		https://regex101.com/
 	*/
-	nCoreRegexp := `\[NEW TORRENT in \d(.*)\](.*)>\d {0,}?(\d{1,5}\.?\d{0,2}) (MiB|GiB|TiB).*in.*>\s{1,}https:\/\/[a-zA-Z{2,}].*id=(\d+)\s?`
+	nCoreRegexp := `\[NEW TORRENT in .(\D{1,}).*?]\d{0,}\s?(.*)>\d{1,}? {0,}?(\d{1,5}\.?\d{0,2}) (MiB|GiB|TiB).*in.*>\s{1,}https:\/\/[a-zA-Z{2,}].*id=(\d+)\s?`
+
+	// Remove the unicode/non printable characters which screws up the regexp..
+	message := strings.Map(func(r rune) rune {
+		if unicode.IsGraphic(r) {
+			return r
+		}
+		return -1
+	}, line.Text())
+
 	re := regexp.MustCompile(nCoreRegexp)
-	match := re.FindStringSubmatch(line.Text())
+	match := re.FindStringSubmatch(message)
 
 	if len(match) > 0 {
 		id, _ := strconv.Atoi(match[5])
@@ -130,24 +132,28 @@ func handleMessage(cfg *config.Config, line *irc.Line) {
 		downloadLink := strings.Replace(cfg.DownloadLink, "[ID]", strconv.Itoa(t.ID), -1)
 		downloadLink = strings.Replace(downloadLink, "[PASSKEY]", cfg.Passkey, -1)
 
-		log.Debugf("[*] New torrent [*]\nName:\t\t%s\nID:\t\t%d\nSize:\t\t%.02f %s\nCategory:\t%s", t.Name, t.ID, t.Size.Size, t.Size.Unit, t.Category)
+		log.
+			Debugf("[*] New torrent [*]\nName:\t\t%s\nID:\t\t%d\nSize:\t\t%.02f %s\nCategory:\t%s", t.Name, t.ID, t.Size.Size, t.Size.Unit, t.Category)
 
 		// Download the .torrent file
-		go func(dir, name string) {
+		go func(dir string, torrent *Torrent) {
 			if err := downloadFile(
-				fmt.Sprintf("%s/%s.torrent", dir, name),
+				fmt.Sprintf("%s/%s.torrent", dir, torrent.Name),
 				downloadLink,
 			); err != nil {
-				log.Warnf("[~] iRC downloader - ERROR: unable to download file: %s E: %s", name, err.Error())
+				log.Warnf("[~] iRC downloader - ERROR: unable to download file: %s E: %s", torrent.Name, err.Error())
 			}
-			log.Infof("[~] iRC downloader - Downloaded: %s", name)
-		}(cfg.DownloadDir, t.Name)
+			log.
+				WithField("Category", torrent.Category).
+				WithField("Size", fmt.Sprintf("%.2f %s", torrent.Size.Size, torrent.Size.Unit)).
+				Infof("[~] iRC downloader - %s", torrent.Name)
+		}(cfg.DownloadDir, &t)
 
 		return
 	}
 
 	// Unknown message
-	log.Infof("%s >> %s >> %v\n", line.Time.Format("15:04:05"), line.Nick, line.Text())
+	log.Infof("%s >> %s >> %v\n", line.Time.Format("15:04:05"), line.Nick, message)
 }
 
 // DownloadFile will download a url to a local file. It's efficient because it will
