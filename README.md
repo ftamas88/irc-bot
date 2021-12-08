@@ -39,3 +39,5 @@ make fmt lint test
 | `NICK`            | string | Yes       | iRC bot nickname          |
 | `DOWNLOAD_DIR`    | string | Yes       | Download folder relative to the root  |
 | `DOWNLOAD_LINK`   | string | Yes       | Don't change it, template to download |
+
+[!docs/screenshots/irc_downloader.png]
