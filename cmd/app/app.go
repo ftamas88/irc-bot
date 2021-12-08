@@ -19,7 +19,7 @@ import (
 )
 
 func init() {
-	// Log as JSON instead of the default ASCII formatter.
+	// Log as Text
 	log.SetFormatter(&log.TextFormatter{
 		ForceColors:            true,
 		TimestampFormat:        "15:04:05",
@@ -27,11 +27,9 @@ func init() {
 		DisableLevelTruncation: false,
 	})
 
-	// Output to stdout instead of the default stderr
-	// Can be any io.Writer, see below for File example
 	log.SetOutput(os.Stdout)
 
-	// Only log the warning severity or above.
+	// Available options in this app: Debug, Info, Warn
 	log.SetLevel(log.DebugLevel)
 }
 
@@ -74,8 +72,8 @@ func main() {
 		func(conn *irc.Conn, line *irc.Line) {
 			log.WithField("server", config.Server).Info("[+] Connected to the iRC server")
 
-			// conn.Privmsg("NBOT", fmt.Sprintf("!invite %s", config.InviteCode))
-			// conn.Mode("#ncore-bot", "+r")
+			conn.Privmsg("NBOT", fmt.Sprintf("!invite %s", config.InviteCode))
+			conn.Mode("#ncore-bot", "+r")
 			conn.Join("#ncore-bot")
 		},
 	)

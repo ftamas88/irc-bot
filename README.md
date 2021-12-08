@@ -27,3 +27,15 @@ go run cmd/app/app.go
 ```
 make fmt lint test
 ```
+
+## Environment Variables
+
+| Key               | Type   | Mandatory | Description               |
+|:------------------|:-------|:----------|:--------------------------|
+| `PASSKEY`         | string | Yes       | Your tracker passkey      |
+| `INVITE_CODE`     | string | Yes       | iRC invite code           |
+| `SERVER`          | string | Yes       | iRC server IP/Hostname    |
+| `PORT`            | integer| Yes       | iRC server port number    |
+| `NICK`            | string | Yes       | iRC bot nickname          |
+| `DOWNLOAD_DIR`    | string | Yes       | Download folder relative to the root  |
+| `DOWNLOAD_LINK`   | string | Yes       | Don't change it, template to download |
