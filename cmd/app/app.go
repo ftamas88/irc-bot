@@ -102,7 +102,7 @@ func handleMessage(cfg *config.Config, line *irc.Line) {
 	/*
 		https://regex101.com/
 	*/
-	nCoreRegexp := `\[NEW TORRENT in .\d{0,}?(\D{1,}).*?]\d{0,}\s?(.*)>\d{1,}? {0,}?(\d{1,5}\.?\d{0,2}) (MiB|GiB|TiB).*in.*>\s{1,}https:\/\/[a-zA-Z{2,}].*id=(\d+)\s?`
+	nCoreRegexp := `\[NEW TORRENT in .\d{0,}?(\D{1,}).*]\d{0,}\s?(.*)\14?\s>\d{1,}? {0,}?(\d{1,5}\.?\d{0,2}) (MiB|GiB|TiB).*in.*>\s{1,}https:\/\/[a-zA-Z{2,}].*id=(\d+)\s?`
 
 	// Remove the unicode/non printable characters which screws up the regexp..
 	message := strings.Map(func(r rune) rune {
