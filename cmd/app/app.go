@@ -106,12 +106,15 @@ func main() {
 }
 
 func handleMessage(cfg *config.Config, line *irc.Line) {
-	nCoreRegexp := `\[NEW TORRENT in ?\d(.*)\]\d? (.*)>\d?\s{1,}(\d{1,4}\.\d{1,2}) (MiB|GiB|TiB)\s{1,}in.*>\s{1,}https:\/\/[a-zA-Z{2,}].*id=(\d+)\s?`
+	/*
+		https://regex101.com/
+	*/
+	nCoreRegexp := `\[NEW TORRENT in \d(.*)\](.*)>\d {0,}?(\d{1,5}\.?\d{0,2}) (MiB|GiB|TiB).*in.*>\s{1,}https:\/\/[a-zA-Z{2,}].*id=(\d+)\s?`
 	re := regexp.MustCompile(nCoreRegexp)
 	match := re.FindStringSubmatch(line.Text())
 
 	if len(match) > 0 {
-		id, _ := strconv.Atoi(match[6])
+		id, _ := strconv.Atoi(match[5])
 		size, _ := strconv.ParseFloat(match[3], 64)
 		t := Torrent{
 			ID:       id,
