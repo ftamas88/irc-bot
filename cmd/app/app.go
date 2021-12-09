@@ -50,37 +50,37 @@ type Size struct {
 func main() {
 	log.Info("[~] iRC downloader - initalising")
 
-	config, err := config.ReadConfig()
+	conf, err := config.ReadConfig()
 	if err != nil {
 		log.Fatalf("[~] iRC downloader - fatal error: %s", err.Error())
 	}
 
-	client := client.Client(config)
+	cl := client.Client(conf)
 
 	// Initial stuff
-	client.HandleFunc(irc.CONNECTED,
+	cl.HandleFunc(irc.CONNECTED,
 		func(conn *irc.Conn, line *irc.Line) {
 			log.
-				WithField("server", config.Server).
-				WithField("port", config.Port).
+				WithField("server", conf.Server).
+				WithField("port", conf.Port).
 				Info("[+] Connected to the iRC server")
 
-			conn.Privmsg("NBOT", fmt.Sprintf("!invite %s", config.InviteCode))
+			conn.Privmsg("NBOT", fmt.Sprintf("!invite %s", conf.InviteCode))
 			conn.Mode("#ncore-bot", "+r")
 			conn.Join("#ncore-bot")
 		},
 	)
 
 	// On Receive
-	client.HandleFunc(irc.PRIVMSG,
+	cl.HandleFunc(irc.PRIVMSG,
 		func(conn *irc.Conn, line *irc.Line) {
-			handleMessage(config, line)
+			handleMessage(conf, line)
 		},
 	)
 
 	// Disconnect
 	quit := make(chan bool)
-	client.HandleFunc(
+	cl.HandleFunc(
 		irc.DISCONNECTED,
 		func(conn *irc.Conn, line *irc.Line) {
 			quit <- true
@@ -88,11 +88,11 @@ func main() {
 	)
 
 	// Connect
-	if err := client.Connect(); err != nil {
+	if err := cl.Connect(); err != nil {
 		log.Infof("Connection error: %s\n", err.Error())
 	}
 
-	go shutdownHandler(client)
+	go shutdownHandler(cl)
 
 	// Wait for disconnect
 	<-quit
@@ -132,22 +132,25 @@ func handleMessage(cfg *config.Config, line *irc.Line) {
 		downloadLink := strings.Replace(cfg.DownloadLink, "[ID]", strconv.Itoa(t.ID), -1)
 		downloadLink = strings.Replace(downloadLink, "[PASSKEY]", cfg.Passkey, -1)
 
-		log.
-			Debugf("[*] New torrent [*]\nName:\t\t%s\nID:\t\t%d\nSize:\t\t%.02f %s\nCategory:\t%s", t.Name, t.ID, t.Size.Size, t.Size.Unit, t.Category)
+		if t.Size.Size > 12 && t.Size.Unit == "GiB" && !strings.Contains(t.Category, "xxx") {
 
-		// Download the .torrent file
-		go func(dir string, torrent *Torrent) {
-			if err := downloadFile(
-				fmt.Sprintf("%s/%s.torrent", dir, torrent.Name),
-				downloadLink,
-			); err != nil {
-				log.Warnf("[~] iRC downloader - ERROR: unable to download file: %s E: %s", torrent.Name, err.Error())
-			}
 			log.
-				WithField("Category", torrent.Category).
-				WithField("Size", fmt.Sprintf("%.2f %s", torrent.Size.Size, torrent.Size.Unit)).
-				Infof("[~] iRC downloader - %s", torrent.Name)
-		}(cfg.DownloadDir, &t)
+				Debugf("[*] New torrent [*]\nName:\t\t%s\nID:\t\t%d\nSize:\t\t%.02f %s\nCategory:\t%s", t.Name, t.ID, t.Size.Size, t.Size.Unit, t.Category)
+
+			// Download the .torrent file
+			go func(dir string, torrent *Torrent) {
+				if err := downloadFile(
+					fmt.Sprintf("%s/%s.torrent", dir, torrent.Name),
+					downloadLink,
+				); err != nil {
+					log.Warnf("[~] iRC downloader - ERROR: unable to download file: %s E: %s", torrent.Name, err.Error())
+				}
+				log.
+					WithField("Category", torrent.Category).
+					WithField("Size", fmt.Sprintf("%.2f %s", torrent.Size.Size, torrent.Size.Unit)).
+					Infof("[~] iRC downloader - %s", torrent.Name)
+			}(cfg.DownloadDir, &t)
+		}
 
 		return
 	}
@@ -166,7 +169,9 @@ func downloadFile(filepath string, url string) error {
 		log.Warnf("error downloading the file: %s", err.Error())
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	// Create the file
 	out, err := os.Create(filepath)
@@ -174,7 +179,9 @@ func downloadFile(filepath string, url string) error {
 		log.Warnf("error downloading the file: %s", err.Error())
 		return err
 	}
-	defer out.Close()
+	defer func() {
+		_ = out.Close()
+	}()
 
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)

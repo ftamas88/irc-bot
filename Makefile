@@ -11,7 +11,7 @@ setup: ## Downloads and install various libs for development.
 
 .PHONY: build
 build: lint ## Builds project binary.
-	go build -ldflags -race -o ./bin/$(SERVICE_NAME).exe -v ./cmd/app/app.go
+	go build -a -o ./bin/$(SERVICE_NAME).exe -v ./cmd/app/app.go
 
 .PHONY: test
 test: lint ## Runs the test suite. Some projects might rely on a local development infrasructure to run tests. See `infra-up`.
