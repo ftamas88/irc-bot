@@ -1,0 +1,30 @@
+trackers:
+  - name: nc
+    enabled: true
+    passkey: "xxx"
+    auth_key: ""
+    command: "/msg NBOT !invite yyy"
+    download_dir: "./_watch"
+    server: "irc.ncore.pro"
+    ssl: true
+    port: 6697
+    nick: ftamas88-autodl-5
+    min_filesize: 1
+    max_filesize: 99
+    filters:
+      - categories: "hd,hd_hun,xvidser,xvidser_hun,iso,game_iso,game_rip"
+
+  - name: local
+    enabled: true
+    debug: true
+    passkey: "4dc4aedea8beda25e566bd7847a5a8c0"
+    command: "PRIVMSG bot : !invite invitecode"
+    download_dir: "./_watch"
+    server: "192.168.1.10"
+    ssl: false
+    port: 6667
+    nick: bot
+    min_filesize: 100MB
+    max_filesize: 99GiB
+    filters:
+      - categories: "hd,hd_hun,xvidser,xvidser_hun,iso,game_iso,game_rip"

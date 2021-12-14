@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<trackerinfo
+		type="local"
+		shortName="local"
+		longName="Local server"
+		siteName="Local test">
+
+	<settings>
+		<description text="Check a torrent download link. key='value' is your passkey."/>
+		<passkey/>
+	</settings>
+
+	<servers>
+		<server
+				network="Local"
+				serverNames="192.168.1.10"
+				channelNames="#bot"
+				announcerNames="Test"
+		/>
+	</servers>
+
+	<parseinfo>
+		<linepatterns>
+			<extract>
+				<regex value="\[NEW TORRENT in .\d{0,}?(\D{1,}).*]\d{0,}\s?(.*)\14?\s>\d{1,}? {0,}?\d?.* (\d.*.*\DiB).*in.*>\s{1,}(https?:\/\/ncore.pro.*action=).*id=(\d+)\s?"/>
+				<vars>
+					<var name="category"/>
+					<var name="torrentName"/>
+					<var name="$torrentSize"/>
+					<var name="$baseUrl"/>
+					<var name="$torrentId"/>
+				</vars>
+			</extract>
+		</linepatterns>
+		<linematched>
+			<var name="torrentUrl">
+				<var name="$baseUrl"/>
+				<string value="download&amp;id="/>
+				<var name="$torrentId"/>
+				<string value="&amp;key="/>
+				<var name="passkey"/>
+			</var>
+		</linematched>
+		<ignore>
+		</ignore>
+	</parseinfo>
+</trackerinfo>
