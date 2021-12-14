@@ -1,22 +1,16 @@
 package main
 
 import (
-	"fmt"
-	"io"
-	"net/http"
+	"context"
+	"github.com/ftamas88/irc-bot/internal/app"
+	"github.com/ftamas88/irc-bot/internal/config"
+	"github.com/ftamas88/irc-bot/internal/irc"
+	"github.com/ftamas88/irc-bot/internal/tracker"
+	"github.com/joho/godotenv"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
-	"regexp"
-	"strconv"
-	"strings"
 	"syscall"
-	"time"
-	"unicode"
-
-	irc "github.com/fluffle/goirc/client"
-	"github.com/ftamas88/irc-bot/internal/client"
-	"github.com/ftamas88/irc-bot/internal/config"
-	log "github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -34,177 +28,55 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
-// Torrent contains the basic information retrieved from the channel
-type Torrent struct {
-	Category string
-	Name     string
-	Size     Size
-	ID       int
-}
-
-type Size struct {
-	Size float64
-	Unit string
-}
-
 func main() {
-	log.Info("[~] iRC downloader - initalising")
+	log.Info("[~] (~‾▿‾)~ >> iRC downloader - initialising ")
 
-	conf, err := config.ReadConfig()
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("[~] iRC downloader - Error loading .env file")
+	}
+
+	c, err := config.ReadConfig()
 	if err != nil {
 		log.Fatalf("[~] iRC downloader - fatal error: %s", err.Error())
 	}
 
-	cl := client.Client(conf)
+	ctx, cancel := context.WithCancel(context.Background())
 
-	// Initial stuff
-	cl.HandleFunc(irc.CONNECTED,
-		func(conn *irc.Conn, line *irc.Line) {
-			log.
-				WithField("server", conf.Server).
-				WithField("port", conf.Port).
-				Info("[+] Connected to the iRC server")
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
 
-			conn.Privmsg("NBOT", fmt.Sprintf("!invite %s", conf.InviteCode))
-			conn.Mode("#ncore-bot", "+r")
-			conn.Join("#ncore-bot")
-		},
-	)
+	go signalHandler(signChan, cancel)
 
-	// On Receive
-	cl.HandleFunc(irc.PRIVMSG,
-		func(conn *irc.Conn, line *irc.Line) {
-			handleMessage(conf, line)
-		},
-	)
-
-	// Disconnect
-	quit := make(chan bool)
-	cl.HandleFunc(
-		irc.DISCONNECTED,
-		func(conn *irc.Conn, line *irc.Line) {
-			quit <- true
-		},
-	)
-
-	// Connect
-	if err := cl.Connect(); err != nil {
-		log.Infof("Connection error: %s\n", err.Error())
+	trs, err := tracker.NewTrackerService(c.Tracker)
+	if err != nil {
+		log.Fatalf("[~] iRC downloader - fatal error: %s", err.Error())
 	}
 
-	go shutdownHandler(cl)
+	ic := irc.NewClient(ctx, c, trs)
 
-	// Wait for disconnect
-	<-quit
+	if err := app.New(trs, ic, 3).Start(ctx); err != nil {
+		log.Fatal(err)
+	}
 }
 
-func handleMessage(cfg *config.Config, line *irc.Line) {
-	/*
-		https://regex101.com/
-	*/
-	nCoreRegexp := `\[NEW TORRENT in .\d{0,}?(\D{1,}).*]\d{0,}\s?(.*)\14?\s>\d{1,}? {0,}?(\d{1,5}\.?\d{0,2}) (MiB|GiB|TiB).*in.*>\s{1,}https:\/\/[a-zA-Z{2,}].*id=(\d+)\s?`
+// signalHandler function runs as a goroutine behind the scene. It helps
+// to trigger application shutdown by listening on certain signals as soon as
+// they arrive. signChan channel is used to transmit signal notifications.
+// Currently, handled signals are listed below as follows.
+//
+// os.Interrupt: Ctrl-C
+// syscall.SIGTERM: kill PID, docker stop, docker down
+func signalHandler(signChan chan os.Signal, cancel context.CancelFunc) {
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
 
-	// Remove the unicode/non printable characters which screws up the regexp..
-	message := strings.Map(func(r rune) rune {
-		if unicode.IsGraphic(r) {
-			return r
-		}
-		return -1
-	}, line.Text())
+	// Waiting for a signal to be sent on the signChan channel so that the
+	// application shutdown can be triggered. If so, following lines are
+	// executed otherwise this is a blocking line.
+	sig := <-signChan
 
-	re := regexp.MustCompile(nCoreRegexp)
-	match := re.FindStringSubmatch(message)
+	log.Infof("[!] ¯`(>▂<)´¯ shutdown started with %v signal", sig)
 
-	if len(match) > 0 {
-		id, _ := strconv.Atoi(match[5])
-		size, _ := strconv.ParseFloat(match[3], 64)
-		t := Torrent{
-			ID:       id,
-			Name:     match[2],
-			Category: match[1],
-			Size: Size{
-				Size: size,
-				Unit: match[4],
-			},
-		}
-
-		// Create the download link
-		downloadLink := strings.Replace(cfg.DownloadLink, "[ID]", strconv.Itoa(t.ID), -1)
-		downloadLink = strings.Replace(downloadLink, "[PASSKEY]", cfg.Passkey, -1)
-
-		if t.Size.Size > 12 && t.Size.Unit == "GiB" && !strings.Contains(t.Category, "xxx") {
-
-			log.
-				Debugf("[*] New torrent [*]\nName:\t\t%s\nID:\t\t%d\nSize:\t\t%.02f %s\nCategory:\t%s", t.Name, t.ID, t.Size.Size, t.Size.Unit, t.Category)
-
-			// Download the .torrent file
-			go func(dir string, torrent *Torrent) {
-				if err := downloadFile(
-					fmt.Sprintf("%s/%s.torrent", dir, torrent.Name),
-					downloadLink,
-				); err != nil {
-					log.Warnf("[~] iRC downloader - ERROR: unable to download file: %s E: %s", torrent.Name, err.Error())
-				}
-				log.
-					WithField("Category", torrent.Category).
-					WithField("Size", fmt.Sprintf("%.2f %s", torrent.Size.Size, torrent.Size.Unit)).
-					Infof("[~] iRC downloader - %s", torrent.Name)
-			}(cfg.DownloadDir, &t)
-		}
-
-		return
-	}
-
-	// Unknown message
-	log.Infof("%s >> %s >> %v\n", line.Time.Format("15:04:05"), line.Nick, message)
-}
-
-// DownloadFile will download a url to a local file. It's efficient because it will
-// write as it downloads and not load the whole file into memory.
-func downloadFile(filepath string, url string) error {
-
-	// Get the data
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Warnf("error downloading the file: %s", err.Error())
-		return err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		log.Warnf("error downloading the file: %s", err.Error())
-		return err
-	}
-	defer func() {
-		_ = out.Close()
-	}()
-
-	// Write the body to file
-	_, err = io.Copy(out, resp.Body)
-
-	if err != nil {
-		log.Warnf("error downloading the file: %s", err.Error())
-		return err
-	}
-
-	return nil
-}
-
-// shutdownHandler listens for a SIGTERM signal
-// and gracefully cancels the main application context
-// once this is completed exits the app
-func shutdownHandler(client *irc.Conn) {
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
-
-	log.Warnf("[!] iRC downloader - Bye :o/")
-	client.Quit("bye")
-
-	<-time.After(time.Duration(1) * time.Second)
-	os.Exit(1)
+	// Tell application to start abandoning its work.
+	cancel()
 }

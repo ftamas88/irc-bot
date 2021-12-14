@@ -3,8 +3,9 @@
 ## Table of Contents
 * [About](#about)
 * [Environment Variables](#environment-variables)
+* [Configuration file](#configuration-file)
 * [Quickstart](#quickstart)
-* [Tour](#tour)
+* [Tour](#Tour-/-Screenshots)
 
 ## About
 This bot connects to a list of IRC servers and downloads the .torrent files based on the configuration given
@@ -19,16 +20,11 @@ This bot connects to a list of IRC servers and downloads the .torrent files base
 
 Please update the values according the description
 
-| Key               | Type   | Mandatory | Description               |
-|:------------------|:-------|:----------|:--------------------------|
-| `PASSKEY`         | string | Yes       | Your tracker passkey      |
-| `INVITE_CODE`     | string | Yes       | iRC invite code           |
-| `SERVER`          | string | Yes       | iRC server IP/Hostname    |
-| `PORT`            | integer| Yes       | iRC server port number    |
-| `NICK`            | string | Yes       | iRC bot nickname          |
-| `DOWNLOAD_DIR`    | string | Yes       | Download folder relative to the root  |
-| `DOWNLOAD_LINK`   | string | Yes       | Don't change it, template to download |
+| Key               | Type   | Mandatory | Description                                 |
+|:------------------|:-------|:----------|:--------------------------------------------|
+| `TRACKERS_FOLDER` | string | Yes       | Link to the trackers folder (`./trackers/`) |
 
+## Configuration file
 
 ## Quickstart
 ### Run the service

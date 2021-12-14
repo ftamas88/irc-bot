@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<trackerinfo
+        type="nc"
+        shortName="nC"
+        longName="nCore"
+        siteName="ncore.pro">
+
+    <settings>
+        <description text="Check a torrent download link. key='value' is your passkey."/>
+        <passkey/>
+    </settings>
+
+    <servers>
+        <server
+                network="P2P-NET"
+                serverNames="irc.ncore.pro"
+                channelNames="#ncore-bot"
+                announcerNames="nCore"
+        />
+    </servers>
+
+    <parseinfo>
+        <linepatterns>
+            <extract>
+                <!--FAKE: [NEW TORRENT in hdser_hun] Sherlock.S01-S04.COMPLETE.1080p.BluRay.DD5.1.x264.HUN.ENG-pcroland > 227.97 GiB in 46F > https://ncore.pro/torrents.php?action=details&id=3119161-->
+                <!--REAL: 14[NEW TORRENT in 9xvidser_hun14]9 FBI.Most.Wanted.S02E06.HUN.WEBRip.x264-HNZ14 >9 308.86 MiB14 in9 2F        14 > https://ncore.pro/torrents.php?action=details&id=3269485-->
+                <regex value="\[NEW TORRENT in .\d{0,}?(\D{1,}).*]\d{0,}\s?(.*)\14?\s>\d{1,}? {0,}?\d?.* (\d.*.*\DiB).*in.*>\s{1,}(https?:\/\/ncore.pro.*action=).*id=(\d+)\s?"/>
+                <vars>
+                    <var name="category"/>
+                    <var name="torrentName"/>
+                    <var name="$torrentSize"/>
+                    <var name="$baseUrl"/>
+                    <var name="$torrentId"/>
+                </vars>
+            </extract>
+        </linepatterns>
+        <linematched>
+            <var name="torrentUrl">
+                <var name="$baseUrl"/>
+                <string value="download&amp;id="/>
+                <var name="$torrentId"/>
+                <string value="&amp;key="/>
+                <var name="passkey"/>
+            </var>
+        </linematched>
+        <ignore>
+        </ignore>
+    </parseinfo>
+</trackerinfo>
